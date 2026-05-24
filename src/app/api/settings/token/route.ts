@@ -8,7 +8,7 @@ export async function GET() {
 
   const admin = createAdminClient()
 
-  let { data: tokenRow } = await admin
+  let { data: tokenRow, error: selectError } = await admin
     .from('email_tokens')
     .select('token')
     .eq('user_id', user.id)
@@ -16,14 +16,24 @@ export async function GET() {
 
   if (!tokenRow) {
     const token = crypto.randomUUID().replace(/-/g, '').substring(0, 16)
-    const { data } = await admin
+    const { data, error: insertError } = await admin
       .from('email_tokens')
       .insert({ user_id: user.id, token })
       .select('token')
       .single()
+
+    if (insertError) {
+      console.error('Insert error:', insertError)
+      return NextResponse.json({ error: insertError.message, details: insertError }, { status: 500 })
+    }
     tokenRow = data
   }
 
+  if (!tokenRow) {
+    console.error('Select error:', selectError)
+    return NextResponse.json({ error: 'Could not generate token' }, { status: 500 })
+  }
+
   const domain = process.env.NEXT_PUBLIC_EMAIL_DOMAIN || 'mail.yourdomain.com'
-  return NextResponse.json({ email: `${tokenRow!.token}@${domain}` })
+  return NextResponse.json({ email: `${tokenRow.token}@${domain}` })
 }
