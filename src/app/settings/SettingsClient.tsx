@@ -109,7 +109,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-xs text-amber-600 mt-2">
-            This points <code>mail.{domain}</code> to Postmark's inbound servers. Changes take up to 24h to propagate.
+            This points <code>{domain}</code> to Postmark's inbound servers. Changes take up to 24h to propagate.
           </p>
         </section>
       </div>
