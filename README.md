@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DropTask
 
-## Getting Started
+Forward an email, get a task. Every email you forward to your own generated address lands
+on your board with the sender, deadline, priority, and attachments already pulled out of it.
 
-First, run the development server:
+**[Live →](https://droptask.vercel.app)**
+
+## How it works
+
+Sign up and you get a unique inbound address — something like `a1b2c3@mail.yourdomain.com`.
+Forward anything to it from any client on any device. Postmark receives the mail and posts
+it to `/api/email`, which:
+
+- resolves the address token back to your account
+- strips quoted replies and signature footers (`Sent from my…`, `Get Outlook`,
+  unsubscribe blocks) so the task body is the actual message
+- parses a deadline out of natural language with [chrono-node](https://github.com/wanasit/chrono),
+  ignoring anything that already resolves to the past
+- infers priority from the wording — "asap" and "critical" read as urgent, "no rush" and
+  "fyi" as low
+- stores attachments in private Supabase storage
+
+The task shows up on your dashboard within a few seconds.
+
+## Stack
+
+Next.js (App Router) with TypeScript and Tailwind. Supabase for auth, Postgres, and
+private file storage. Postmark for inbound email. Deployed on Vercel.
+
+Three tables: `email_tokens` maps a forwarding address to a user, `tasks` holds the
+parsed result, `attachments` points at stored files. Schema is in
+[`supabase-schema.sql`](supabase-schema.sql).
+
+## Layout
+
+```
+src/app/api/email/       the inbound webhook — parse and store
+src/app/api/tasks/       task CRUD
+src/app/api/settings/    forwarding address management
+src/app/dashboard/       the board
+src/lib/email-parser.ts  deadline, priority, and body extraction
+src/lib/supabase*.ts     browser and server clients
+```
+
+## Running it locally
+
+Requires Node 20+, plus a Supabase project and a Postmark server.
+
+```bash
+npm install
+cp .env.local.example .env.local
+```
+
+Fill in `.env.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=      # server-side only — never commit this
+NEXT_PUBLIC_EMAIL_DOMAIN=       # e.g. mail.yourdomain.com
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Inbound email won't reach localhost on its own — point the Postmark webhook at an ngrok
+tunnel to test the full path.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Full deployment walkthrough, including the MX record and Postmark wiring:
+**[SETUP.md](SETUP.md)**.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Checks
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+npm run lint
+```
